@@ -1,15 +1,12 @@
-import { kv } from '@vercel/kv';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
-// Middleware to capture raw body for signature verification
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Read raw body
 async function getRawBody(readable) {
   const chunks = [];
   for await (const chunk of readable) {
@@ -18,7 +15,6 @@ async function getRawBody(readable) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-// Verify Shopify webhook signature
 function verifyWebhook(body, hmac, secret) {
   const hash = crypto
     .createHmac('sha256', secret)
@@ -33,71 +29,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Get raw body and HMAC
     const rawBody = await getRawBody(req);
     const hmac = req.headers['x-shopify-hmac-sha256'];
 
-    // Verify webhook signature
     if (!verifyWebhook(rawBody, hmac, process.env.SHOPIFY_WEBHOOK_SECRET)) {
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
     const customer = JSON.parse(rawBody);
-    const customerId = customer.id;
+    const addr = customer.addresses?.[0];
 
-    // Get previous state from Vercel KV
-    const prevCustomer = await kv.get(`bb:customer:${customerId}`);
+    if (!addr) {
+      return res.status(200).json({ success: true });
+    }
 
-    // Store current state (30 day TTL)
-    await kv.set(`bb:customer:${customerId}`, customer, { ex: 86400 * 30 });
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.fastmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.FASTMAIL_EMAIL,
+        pass: process.env.FASTMAIL_PASSWORD,
+      },
+    });
 
-    // Compare addresses
-    const oldAddresses = prevCustomer?.addresses || [];
-    const newAddresses = customer.addresses || [];
-    const addressChanged = JSON.stringify(oldAddresses) !== JSON.stringify(newAddresses);
-
-    // Send email if address changed and we have previous state
-    if (addressChanged && prevCustomer) {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.fastmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.FASTMAIL_EMAIL,
-          pass: process.env.FASTMAIL_PASSWORD,
-        },
-      });
-
-      const oldAddr = oldAddresses[0];
-      const newAddr = newAddresses[0];
-
-      const addressDiff = `
-Old Address:
-${oldAddr?.address1}, ${oldAddr?.city}, ${oldAddr?.province} ${oldAddr?.zip}
-
-New Address:
-${newAddr?.address1}, ${newAddr?.city}, ${newAddr?.province} ${newAddr?.zip}
-      `.trim();
-
-      await transporter.sendMail({
-        from: process.env.FASTMAIL_EMAIL,
-        to: process.env.NOTIFICATION_EMAIL,
-        subject: `🔔 Address Changed — ${customer.first_name} ${customer.last_name}`,
-        html: `
-<h2>Customer Address Changed</h2>
+    await transporter.sendMail({
+      from: process.env.FASTMAIL_EMAIL,
+      to: process.env.NOTIFICATION_EMAIL,
+      subject: `🔔 Customer Updated — ${customer.first_name} ${customer.last_name}`,
+      html: `
+<h2>Customer Record Updated</h2>
 <p><strong>${customer.first_name} ${customer.last_name}</strong></p>
 <p>Email: <code>${customer.email}</code></p>
 
-<h3>Old → New</h3>
-<pre>${addressDiff}</pre>
+<h3>Current Address</h3>
+<p>
+  ${addr.address1}${addr.address2 ? '<br>' + addr.address2 : ''}<br>
+  ${addr.city}, ${addr.province} ${addr.zip}<br>
+  ${addr.country}
+</p>
 
-<p><a href="https://admin.shopify.com/admin/customers/${customerId}">View in Shopify Admin</a></p>
-        `,
-      });
+<p><a href="https://admin.shopify.com/admin/customers/${customer.id}">View in Shopify Admin</a></p>
+      `,
+    });
 
-      console.log(`Address change email sent for customer ${customerId}`);
-    }
-
+    console.log(`Customer update email sent for ${customer.email}`);
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error('Webhook error:', error);
