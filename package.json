@@ -1,0 +1,17 @@
+{
+  "name": "shopify-webhooks",
+  "version": "1.0.0",
+  "description": "Shopify webhook handler for customer address changes",
+  "main": "api/webhooks/customer-update.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build"
+  },
+  "dependencies": {
+    "@vercel/kv": "^0.2.0",
+    "nodemailer": "^6.9.0"
+  },
+  "devDependencies": {
+    "vercel": "^latest"
+  }
+}

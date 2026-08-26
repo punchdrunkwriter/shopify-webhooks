@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "env": [
+    {
+      "key": "SHOPIFY_WEBHOOK_SECRET",
+      "value": "@shopify_webhook_secret"
+    },
+    {
+      "key": "FASTMAIL_EMAIL",
+      "value": "@fastmail_email"
+    },
+    {
+      "key": "FASTMAIL_PASSWORD",
+      "value": "@fastmail_password"
+    },
+    {
+      "key": "NOTIFICATION_EMAIL",
+      "value": "@notification_email"
+    }
+  ]
+}
