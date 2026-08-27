@@ -31,18 +31,10 @@ export default async function handler(req, res) {
   try {
     const rawBody = await getRawBody(req);
     const hmac = req.headers['x-shopify-hmac-sha256'];
-    const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
 
-    console.log('Received HMAC:', hmac);
-    console.log('Secret exists:', !!secret);
-    console.log('Secret length:', secret?.length);
-
-    if (!verifyWebhook(rawBody, hmac, secret)) {
-      console.log('Signature verification failed');
+    if (!verifyWebhook(rawBody, hmac, process.env.SHOPIFY_WEBHOOK_SECRET)) {
       return res.status(401).json({ error: 'Invalid signature' });
     }
-
-    console.log('Signature verified!');
 
     const customer = JSON.parse(rawBody);
     const addr = customer.addresses?.[0];
