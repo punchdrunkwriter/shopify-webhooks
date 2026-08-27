@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Shopify webhook handler for customer address changes",
   "main": "api/webhooks/customer-update.js",
-  "scripts": {}
+  "scripts": {
+    "build": "echo 'Serverless—no build needed'"
+  },
   "dependencies": {
     "nodemailer": "^6.9.0"
   },
